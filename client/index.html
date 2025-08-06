@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Codless App Editor</title>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    button { margin: 0.5em; }
+    #editor { display: none; flex-direction: column; gap: 1em; }
+    textarea { width: 100%; height: 60vh; font-family: monospace; }
+    .file-list { margin-top: 1em; }
+    .file-item { cursor: pointer; padding: 0.3em 0; }
+    .file-item:hover { text-decoration: underline; color: blue; }
+  </style>
+</head>
+<body>
+  <h1>Codless Editor</h1>
+
+  <div id="main">
+    <button onclick="createNewFile()">➕ Create New File</button>
+    <div class="file-list" id="fileList"></div>
+  </div>
+
+  <div id="editor">
+    <h2 id="fileTitle"></h2>
+    <textarea id="textArea"></textarea>
+    <div>
+      <button onclick="saveFile()">💾 Save</button>
+      <button onclick="exitEditor()">⬅️ Exit</button>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = '/save';
+    const fileListEl = document.getElementById('fileList');
+    const editorEl = document.getElementById('editor');
+    const mainEl = document.getElementById('main');
+    const fileTitleEl = document.getElementById('fileTitle');
+    const textAreaEl = document.getElementById('textArea');
+
+    let currentFile = null;
+
+    function loadFileList() {
+      const files = JSON.parse(localStorage.getItem('codless_files') || '[]');
+      fileListEl.innerHTML = files.map(name =>
+        `<div class="file-item" onclick="openFile('${name}')">${name}</div>`
+      ).join('');
+    }
+
+    function saveFileList(files) {
+      localStorage.setItem('codless_files', JSON.stringify(files));
+    }
+
+    function createNewFile() {
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/html' },
+        body: '<!-- new file -->'
+      })
+        .then(res => res.json())
+        .then(data => {
+          const filename = data.filename;
+          const files = JSON.parse(localStorage.getItem('codless_files') || '[]');
+          files.push(filename);
+          saveFileList(files);
+          openFile(filename);
+        })
+        .catch(err => alert('Failed to create file: ' + err));
+    }
+
+    function openFile(filename) {
+      fetch(`/${filename}`)
+        .then(res => res.text())
+        .then(content => {
+          currentFile = filename;
+          fileTitleEl.textContent = filename;
+          textAreaEl.value = content;
+          mainEl.style.display = 'none';
+          editorEl.style.display = 'flex';
+        })
+        .catch(err => alert('Failed to load file: ' + err));
+    }
+
+    function saveFile() {
+      if (!currentFile) return;
+      fetch(`${API_URL}/${currentFile}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/html' },
+        body: textAreaEl.value
+      })
+        .then(() => alert('Saved!'))
+        .catch(err => alert('Failed to save: ' + err));
+    }
+
+    function exitEditor() {
+      currentFile = null;
+      textAreaEl.value = '';
+      editorEl.style.display = 'none';
+      mainEl.style.display = 'block';
+      loadFileList();
+    }
+
+    loadFileList();
+  </script>
+</body>
+</html>
