@@ -3,30 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <title>Codless App Editor</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <style>
-    body { font-family: sans-serif; margin: 2em; }
-    button { margin: 0.5em; }
-    #editor { display: none; flex-direction: column; gap: 1em; }
-    textarea { width: 100%; height: 60vh; font-family: monospace; }
-    .file-list { margin-top: 1em; }
-    .file-item { cursor: pointer; padding: 0.3em 0; }
-    .file-item:hover { text-decoration: underline; color: blue; }
+    :root{
+      --bg:#0f172a; --card:#0b1220; --text:#e5e7eb; --muted:#94a3b8; --b:#1f2937; --brand:#38bdf8;
+    }
+    *{box-sizing:border-box}
+    body{
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+      margin:0; background:linear-gradient(180deg,#0b1220,#0f172a 60%); color:var(--text);
+    }
+    .wrap{max-width:900px;margin:0 auto;padding:16px}
+    h1{margin:12px 16px 0; font-size:1.25rem}
+    header{
+      position:sticky; top:0; z-index:10;
+      background:rgba(11,18,32,.85); backdrop-filter: blur(8px);
+      border-bottom:1px solid var(--b); padding:10px 12px;
+      display:flex; align-items:center; justify-content:space-between; gap:.5rem;
+    }
+    .btn{
+      appearance:none; border:1px solid var(--b); background:#0b1220; color:var(--text);
+      padding:.7rem 1rem; border-radius:.8rem; font-weight:600; cursor:pointer; touch-action:manipulation
+    }
+    .btn.primary{background:linear-gradient(180deg,#22d3ee,#38bdf8); color:#0b1220; border:none}
+    .file-list{ margin-top:1em; display:grid; gap:.5rem }
+    .file-item{
+      cursor:pointer; padding:.8rem; border:1px solid var(--b); border-radius:.8rem;
+      background:#0e1629; display:flex; align-items:center; justify-content:space-between; gap:.6rem
+    }
+    .file-item b{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+    .muted{color:var(--muted); font-size:.9rem}
+    #editor{ display:none; flex-direction:column; gap: .8rem; }
+    .card{
+      background:#0b1220; border:1px solid var(--b); border-radius:.9rem; padding:.8rem
+    }
+    textarea{
+      width:100%; height:60vh; font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      background:#0b1220; color:#e7eaf0; border:1px solid var(--b); border-radius:.8rem; padding:.7rem; resize:vertical
+    }
+    .row{display:flex; align-items:center; gap:.6rem; flex-wrap:wrap}
+    .grow{flex:1}
+    a.link{color:#a5f3fc; text-decoration:none}
+    /* מצב ריק */
+    .empty{color:var(--muted); text-align:center; padding:32px 8px}
   </style>
 </head>
 <body>
-  <h1>Codless Editor</h1>
+  <header>
+    <strong>Codless Editor</strong>
+    <button class="btn primary" onclick="createNewFile()">➕ Create New</button>
+  </header>
 
-  <div id="main">
-    <button onclick="createNewFile()">➕ Create New File</button>
-    <div class="file-list" id="fileList"></div>
-  </div>
+  <div class="wrap">
+    <div id="main">
+      <div class="row card" style="justify-content:space-between">
+        <span class="muted">Files</span>
+        <button class="btn" onclick="loadFileList()">Refresh</button>
+      </div>
+      <div class="file-list" id="fileList"></div>
+      <div id="empty" class="empty" style="display:none">No files yet. Create a new one ↑</div>
+    </div>
 
-  <div id="editor">
-    <h2 id="fileTitle"></h2>
-    <textarea id="textArea"></textarea>
-    <div>
-      <button onclick="saveFile()">💾 Save</button>
-      <button onclick="exitEditor()">⬅️ Exit</button>
+    <div id="editor">
+      <div class="card">
+        <div class="row" style="align-items:baseline">
+          <h2 id="fileTitle" style="margin:.2rem 0; font-size:1.05rem"></h2>
+          <div class="grow"></div>
+          <!-- קישור לטאב חדש לצפייה בקובץ -->
+          <a id="openLink" class="link" target="_blank" rel="noopener">🔗 Open in new tab</a>
+        </div>
+        <textarea id="textArea" spellcheck="false"></textarea>
+        <div class="row">
+          <button class="btn" onclick="saveFile()">💾 Save</button>
+          <button class="btn" onclick="exitEditor()">⬅️ Exit</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -37,14 +88,19 @@
     const mainEl = document.getElementById('main');
     const fileTitleEl = document.getElementById('fileTitle');
     const textAreaEl = document.getElementById('textArea');
+    const openLinkEl = document.getElementById('openLink');
+    const emptyEl = document.getElementById('empty');
 
     let currentFile = null;
 
     function loadFileList() {
       const files = JSON.parse(localStorage.getItem('codless_files') || '[]');
-      fileListEl.innerHTML = files.map(name =>
-        `<div class="file-item" onclick="openFile('${name}')">${name}</div>`
-      ).join('');
+      fileListEl.innerHTML = files.map(name => `
+        <div class="file-item" onclick="openFile('${name}')">
+          <b>${name}</b>
+          <span class="muted">tap to edit</span>
+        </div>`).join('');
+      emptyEl.style.display = files.length ? 'none':'block';
     }
 
     function saveFileList(files) {
@@ -57,28 +113,29 @@
         headers: { 'Content-Type': 'text/html' },
         body: '<!-- new file -->'
       })
-        .then(res => res.json())
-        .then(data => {
-          const filename = data.filename;
-          const files = JSON.parse(localStorage.getItem('codless_files') || '[]');
-          files.push(filename);
-          saveFileList(files);
-          openFile(filename);
-        })
-        .catch(err => alert('Failed to create file: ' + err));
+      .then(res => res.json())
+      .then(data => {
+        const filename = data.filename;
+        const files = JSON.parse(localStorage.getItem('codless_files') || '[]');
+        files.push(filename);
+        saveFileList(files);
+        openFile(filename);
+      })
+      .catch(err => alert('Failed to create file: ' + err));
     }
 
     function openFile(filename) {
       fetch(`/${filename}`)
-        .then(res => res.text())
-        .then(content => {
-          currentFile = filename;
-          fileTitleEl.textContent = filename;
-          textAreaEl.value = content;
-          mainEl.style.display = 'none';
-          editorEl.style.display = 'flex';
-        })
-        .catch(err => alert('Failed to load file: ' + err));
+      .then(res => res.text())
+      .then(content => {
+        currentFile = filename;
+        fileTitleEl.textContent = filename;
+        textAreaEl.value = content;
+        openLinkEl.href = `/${encodeURIComponent(filename)}`; // קישור לטאב חדש
+        mainEl.style.display = 'none';
+        editorEl.style.display = 'flex';
+      })
+      .catch(err => alert('Failed to load file: ' + err));
     }
 
     function saveFile() {
@@ -88,8 +145,8 @@
         headers: { 'Content-Type': 'text/html' },
         body: textAreaEl.value
       })
-        .then(() => alert('Saved!'))
-        .catch(err => alert('Failed to save: ' + err));
+      .then(() => alert('Saved!'))
+      .catch(err => alert('Failed to save: ' + err));
     }
 
     function exitEditor() {
@@ -103,4 +160,3 @@
     loadFileList();
   </script>
 </body>
-</html>
