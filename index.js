@@ -1,4 +1,5 @@
 const express = require('express');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const bodyParser = require('body-parser');
@@ -52,7 +53,19 @@ app.post('/save/:filename', (req, res) => {
     });
 });
 
+
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running at http://0.0.0.0:${PORT}`);
+});
+
+
+const options = {
+  key: fs.readFileSync('/etc/letsencrypt/live/codless.xyz/privkey.pem'),
+  cert: fs.readFileSync('/etc/letsencrypt/live/codless.xyz/fullchain.pem')
+};
+
+https.createServer(options, app).listen(443, () => {
+  console.log('Server running on https://codless.xyz');
 });
 
